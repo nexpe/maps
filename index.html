@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Optimizador Delivery</title>
+
+<style>
+
+body{
+font-family:Arial;
+padding:20px;
+background:#f5f5f5;
+}
+
+textarea{
+width:100%;
+height:200px;
+font-size:16px;
+padding:10px;
+}
+
+button{
+padding:15px;
+font-size:18px;
+margin-top:10px;
+width:100%;
+cursor:pointer;
+}
+
+#resultado{
+margin-top:20px;
+background:white;
+padding:15px;
+border-radius:10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>Optimizar Ruta Delivery 🛵</h2>
+
+<p>Pega direcciones (una por línea)</p>
+<p>Base (opcional)</p>
+
+<input id="base" type="text"
+placeholder="Ej: Av Argentina 2000 Lima"
+style="
+width:100%;
+padding:10px;
+font-size:16px;
+margin-bottom:10px;
+">
+<textarea id="direcciones"></textarea>
+
+<button onclick="optimizar()">
+Optimizar Ruta
+</button>
+<button onclick="abrirRuta()">
+Abrir Ruta Completa 🛵
+</button>
+<div id="resultado">
+Esperando direcciones...
+</div>
+<div id="mapa" style="
+height:400px;
+margin-top:15px;
+border-radius:10px;
+"></div>
+<script>
+let mapa;
+let ordenFinal=[];
+let miLat;
+let miLon;
+let coordenadasRuta=[];
+async function optimizar(){
+
+let base = document.getElementById("base").value;
+
+if(base.trim()!=""){
+document.getElementById("resultado").innerHTML="Calculando desde base...";
+}else{
+document.getElementById("resultado").innerHTML="Obteniendo ubicación...";
+}
+
+if(base.trim()!=""){
+
+let urlBase="https://nominatim.openstreetmap.org/search?format=json&q="+encodeURIComponent(base);
+
+let rBase = await fetch(urlBase);
+
+let dataBase = await rBase.json();
+
+if(dataBase.length==0){
+
+document.getElementById("resultado").innerHTML="Base no encontrada";
+
+return;
+
+}
+
+let lat=parseFloat(dataBase[0].lat);
+let lon=parseFloat(dataBase[0].lon);
+
+miLat=lat;
+miLon=lon;
+
+procesarDirecciones(lat,lon);
+
+}
+else{
+
+navigator.geolocation.getCurrentPosition(
+
+function(pos){
+
+let lat = pos.coords.latitude;
+let lon = pos.coords.longitude;
+
+miLat = lat;
+miLon = lon;
+
+procesarDirecciones(lat,lon);
+
+},
+
+function(error){
+
+document.getElementById("resultado").innerHTML=
+"No se pudo obtener ubicación.<br><br>Activa el GPS o usa el celular.";
+
+}
+
+);
+
+}
+
+}
+
+function calcularDistanciaReal(lat1,lon1,lat2,lon2){
+
+let R = 6371;
+
+let dLat = (lat2-lat1)*Math.PI/180;
+let dLon = (lon2-lon1)*Math.PI/180;
+
+let a =
+Math.sin(dLat/2)*Math.sin(dLat/2) +
+Math.cos(lat1*Math.PI/180)*
+Math.cos(lat2*Math.PI/180)*
+Math.sin(dLon/2)*Math.sin(dLon/2);
+
+let c = 2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+
+return R*c;
+
+}
+
+async function procesarDirecciones(lat,lon){
+
+let texto = document.getElementById("direcciones").value;
+
+let lista = texto.split("\n");
+
+lista = lista.filter(x=>x.trim()!="");
+
+let resultados=[];
+
+ordenFinal=[];
+coordenadasRuta=[];
+
+for(let direccion of lista){
+
+let url = "https://nominatim.openstreetmap.org/search?format=json&q="+encodeURIComponent(direccion);
+
+let r = await fetch(url);
+
+let data = await r.json();
+
+if(data.length>0){
+
+let dlat = parseFloat(data[0].lat);
+let dlon = parseFloat(data[0].lon);
+
+let distancia = calcularDistanciaReal(lat,lon,dlat,dlon);
+
+resultados.push({
+direccion:direccion,
+distancia:distancia
+});
+
+}
+
+}
+
+resultados = optimizarRutaInteligente(resultados,lat,lon);
+
+let html="<h3>Orden sugerido:</h3>";
+
+for(let i=0;i<resultados.length;i++){
+
+let direccion=resultados[i].direccion;
+
+let link="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(direccion);
+
+html+= (i+1)+". "+direccion+
+" <a href='"+link+"' target='_blank'>📍 Ir</a><br>";
+
+ordenFinal.push(direccion);
+
+}
+
+document.getElementById("resultado").innerHTML=html;
+
+mostrarMapa(resultados,lat,lon);
+
+}
+
+function optimizarRutaInteligente(lista,latInicial,lonInicial){
+
+let rutaFinal=[];
+
+let latActual=latInicial;
+let lonActual=lonInicial;
+
+while(lista.length>0){
+
+let masCercano=0;
+let distanciaMin=999999;
+
+for(let i=0;i<lista.length;i++){
+
+let d=lista[i];
+
+let distancia=d.distancia;
+
+if(distancia<distanciaMin){
+
+distanciaMin=distancia;
+masCercano=i;
+
+}
+
+}
+
+let elegido=lista[masCercano];
+
+rutaFinal.push(elegido);
+
+lista.splice(masCercano,1);
+
+}
+
+return rutaFinal;
+
+}
+
+
+function abrirRuta(){
+
+if(ordenFinal.length==0){
+alert("Primero optimiza la ruta");
+return;
+}
+
+if(!miLat){
+alert("No se obtuvo tu ubicación");
+return;
+}
+
+let url="https://www.google.com/maps/dir/";
+
+// Inicio = tu ubicación
+url+=miLat+","+miLon+"/";
+
+// Destinos
+
+for(let dir of ordenFinal){
+
+url+=encodeURIComponent(dir)+"/";
+
+}
+
+window.open(url,"_blank");
+
+}
+function mostrarMapa(resultados,lat,lon){
+
+if(mapa){
+mapa.remove();
+}
+
+mapa = L.map('mapa').setView([lat,lon],13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:19
+}).addTo(mapa);
+
+// Tu ubicación
+L.marker([lat,lon])
+.addTo(mapa)
+.bindPopup("Inicio")
+.openPopup();
+coordenadasRuta.push([lat,lon]);
+// Destinos
+
+for(let r of resultados){
+
+let url="https://nominatim.openstreetmap.org/search?format=json&q="+encodeURIComponent(r.direccion);
+
+fetch(url)
+.then(res=>res.json())
+.then(data=>{
+
+if(data.length>0){
+
+let dlat=parseFloat(data[0].lat);
+let dlon=parseFloat(data[0].lon);
+
+L.marker([dlat,dlon])
+.addTo(mapa)
+.bindPopup(r.direccion);
+coordenadasRuta.push([dlat,dlon]);
+}
+
+});
+
+}
+setTimeout(function(){
+
+L.polyline(coordenadasRuta,{
+weight:5
+}).addTo(mapa);
+
+},1500);
+}
+</script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+
+</body>
+
+</html>
