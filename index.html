@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RouteOptimizer Pro - Optimizador de Rutas</title>
+    <title>Optimizador de Rutas</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
@@ -483,8 +483,6 @@
             <div class="section-title">🗺️ Visualización del Mapa</div>
             <div id="mapa"></div>
         </div>
-    </div>
-</div> <!-- Cierre del container -->
 
         <!-- Footer -->
         <footer style="
@@ -499,11 +497,11 @@
                 Desarrollado por <strong style="color: #667eea;">Cesar Ancho Dev</strong>
             </p>
             <p style="margin: 10px 0 0 0; color: #999; font-size: 13px;">
-                📱 989 660 431 | © 2026 - Todos los derechos reservados
+                📱 <a href="https://wa.me/51989660431" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 500;">989 660 431</a> | © 2026 - Todos los derechos reservados
             </p>
         </footer>
+    </div>
 
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
         let mapa;
@@ -610,6 +608,7 @@
             }
 
             let resultados = [];
+            let direccionesNoEncontradas = [];
             ordenFinal = [];
             coordenadasRuta = [];
 
@@ -617,13 +616,21 @@
             document.getElementById("resultado").innerHTML = `
                 <div class="alert alert-info">
                     <span>⏳</span>
-                    <span>Procesando direcciones... Esto puede tomar unos segundos</span>
+                    <span>Procesando ${direcciones.length} direcciones... Esto puede tomar unos segundos</span>
                 </div>
             `;
 
             // Geocodificar todas las direcciones con delay
             for (let i = 0; i < direcciones.length; i++) {
                 const direccion = direcciones[i];
+                
+                // Actualizar progreso
+                document.getElementById("resultado").innerHTML = `
+                    <div class="alert alert-info">
+                        <span>⏳</span>
+                        <span>Procesando dirección ${i + 1} de ${direcciones.length}...</span>
+                    </div>
+                `;
                 
                 try {
                     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(direccion)}`;
@@ -645,6 +652,9 @@
                             lon: lon,
                             distancia: distancia
                         });
+                    } else {
+                        // Dirección no encontrada
+                        direccionesNoEncontradas.push(direccion);
                     }
 
                     // Delay de 1 segundo entre peticiones (política de Nominatim)
@@ -653,6 +663,7 @@
                     }
                 } catch (error) {
                     console.error(`Error al geocodificar: ${direccion}`, error);
+                    direccionesNoEncontradas.push(direccion);
                 }
             }
 
@@ -666,7 +677,7 @@
             resultados = optimizarRutaInteligente(resultados, latInicio, lonInicio);
 
             // Mostrar resultados
-            mostrarResultados(resultados, resultados.length, direcciones.length);
+            mostrarResultados(resultados, resultados.length, direcciones.length, direccionesNoEncontradas);
 
             // Mostrar mapa
             mostrarMapa(resultados, latInicio, lonInicio);
@@ -710,35 +721,123 @@
         }
 
         // Mostrar resultados en HTML
-        function mostrarResultados(ruta, puntosGeocodificados, totalIngresados) {
+        function mostrarResultados(ruta, puntosGeocodificados, totalIngresados, direccionesNoEncontradas) {
+            // Guardar ruta optimizada globalmente para uso posterior
+            rutaOptimizadaGlobal = ruta;
+            
             const distanciaTotal = ruta.reduce((sum, punto) => sum + punto.distancia, 0);
+            const MAX_PARADAS_GOOGLE = 9;
 
             let html = `
                 <div class="stats">
                     <div class="stat-card">
                         <div class="stat-value">${ruta.length}</div>
-                        <div class="stat-label">Paradas</div>
+                        <div class="stat-label">Paradas Encontradas</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value">${distanciaTotal.toFixed(1)} km</div>
                         <div class="stat-label">Distancia aprox.</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${totalIngresados}</div>
+                        <div class="stat-label">Total Ingresadas</div>
+                    </div>
                 </div>
             `;
 
-            if (puntosGeocodificados < totalIngresados) {
+            // Advertencia sobre límite de Google Maps
+            if (ruta.length > MAX_PARADAS_GOOGLE) {
+                const numeroRutas = Math.ceil(ruta.length / MAX_PARADAS_GOOGLE);
                 html += `
-                    <div class="alert alert-warning">
-                        <span>⚠️</span>
-                        <span>Se encontraron ${puntosGeocodificados} de ${totalIngresados} direcciones. Verifica las direcciones que no aparecen.</span>
+                    <div class="alert alert-info">
+                        <span>📱</span>
+                        <div>
+                            <strong>Tienes ${ruta.length} paradas divididas en ${numeroRutas} rutas.</strong><br>
+                            Usa el botón <strong>"🗺️ Abrir Ruta X"</strong> para abrir cada grupo en Google Maps.<br>
+                            <small>Cuando termines la Ruta 1, regresa aquí y abre la Ruta 2.</small>
+                        </div>
                     </div>
                 `;
             }
 
-            html += '<ul class="route-list">';
+            // Mostrar alerta si hay direcciones no encontradas
+            if (direccionesNoEncontradas && direccionesNoEncontradas.length > 0) {
+                html += `
+                    <div class="alert alert-warning">
+                        <span>⚠️</span>
+                        <div>
+                            <strong>Se encontraron ${puntosGeocodificados} de ${totalIngresados} direcciones.</strong>
+                            <br><br>
+                            <strong>Direcciones NO encontradas (${direccionesNoEncontradas.length}):</strong>
+                            <ul style="margin: 10px 0 0 20px; padding: 0;">
+                                ${direccionesNoEncontradas.map(dir => `<li style="margin: 5px 0;">${dir}</li>`).join('')}
+                            </ul>
+                            <br>
+                            <small>💡 <strong>Sugerencias:</strong> Verifica la ortografía, agrega más detalles (distrito, ciudad), o usa referencias conocidas.</small>
+                        </div>
+                    </div>
+                `;
+            } else if (puntosGeocodificados === totalIngresados) {
+                html += `
+                    <div class="alert alert-success">
+                        <span>✅</span>
+                        <span>¡Todas las direcciones fueron encontradas correctamente!</span>
+                    </div>
+                `;
+            }
+
+            html += '<ul class="route-list" style="list-style: none; padding: 0;">';
 
             ruta.forEach((punto, index) => {
                 const link = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(punto.direccion)}`;
+                
+                // Marcar visualmente cuando cambia de ruta y agregar botón de abrir
+                if (ruta.length > MAX_PARADAS_GOOGLE && index % MAX_PARADAS_GOOGLE === 0) {
+                    const numeroRuta = Math.floor(index / MAX_PARADAS_GOOGLE) + 1;
+                    const finGrupo = Math.min(index + MAX_PARADAS_GOOGLE, ruta.length);
+                    const direccionesGrupo = ruta.slice(index, finGrupo).map(p => p.direccion);
+                    
+                    // Determinar punto de inicio (para la primera ruta es miLat/miLon, para las demás es la última dirección del grupo anterior)
+                    let inicioLat = miLat;
+                    let inicioLon = miLon;
+                    
+                    html += `
+                        <div style="
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            padding: 15px 20px;
+                            margin: 20px 0 10px 0;
+                            border-radius: 12px;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            flex-wrap: wrap;
+                            gap: 10px;
+                        ">
+                            <div style="font-weight: 600; font-size: 15px;">
+                                🗺️ RUTA ${numeroRuta} - Paradas ${index + 1} a ${finGrupo}
+                            </div>
+                            <button onclick='abrirRutaParcial(${index}, ${finGrupo}, ${numeroRuta})' style="
+                                background: white;
+                                color: #667eea;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 8px;
+                                font-weight: 600;
+                                font-size: 14px;
+                                cursor: pointer;
+                                display: flex;
+                                align-items: center;
+                                gap: 8px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                transition: all 0.3s ease;
+                            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                🗺️ Abrir Ruta ${numeroRuta}
+                            </button>
+                        </div>
+                    `;
+                }
+                
                 html += `
                     <li class="route-item">
                         <div class="route-number">${index + 1}</div>
@@ -767,12 +866,70 @@
                 return;
             }
 
-            let url = `https://www.google.com/maps/dir/${miLat},${miLon}/`;
-            ordenFinal.forEach(dir => {
-                url += `${encodeURIComponent(dir)}/`;
-            });
+            const MAX_PARADAS_GOOGLE = 9; // Google Maps permite máximo 9 destinos + 1 origen = 10 paradas
 
-            window.open(url, "_blank");
+            // Si hay 9 o menos direcciones, abrir una sola ruta
+            if (ordenFinal.length <= MAX_PARADAS_GOOGLE) {
+                let url = `https://www.google.com/maps/dir/${miLat},${miLon}/`;
+                ordenFinal.forEach(dir => {
+                    url += `${encodeURIComponent(dir)}/`;
+                });
+                window.open(url, "_blank");
+                return;
+            }
+
+            // Si hay más de 9, dividir en múltiples rutas
+            const numeroRutas = Math.ceil(ordenFinal.length / MAX_PARADAS_GOOGLE);
+            
+            // Confirmar con el usuario
+            const confirmar = confirm(
+                `Tienes ${ordenFinal.length} direcciones.\n\n` +
+                `Google Maps solo permite 10 paradas por ruta.\n\n` +
+                `Se abrirán ${numeroRutas} pestañas con las rutas divididas.\n\n` +
+                `¿Continuar?`
+            );
+
+            if (!confirmar) return;
+
+            // Dividir y abrir las rutas
+            for (let i = 0; i < ordenFinal.length; i += MAX_PARADAS_GOOGLE) {
+                const chunk = ordenFinal.slice(i, i + MAX_PARADAS_GOOGLE);
+                const numeroRuta = Math.floor(i / MAX_PARADAS_GOOGLE) + 1;
+                
+                // Determinar el punto de inicio
+                let inicioLat, inicioLon;
+                if (i === 0) {
+                    // Primera ruta: usar ubicación original
+                    inicioLat = miLat;
+                    inicioLon = miLon;
+                } else {
+                    // Rutas siguientes: buscar coordenadas de la última dirección de la ruta anterior
+                    const direccionAnterior = ordenFinal[i - 1];
+                    const puntoAnterior = coordenadasRuta.find((coord, idx) => {
+                        // Buscar en resultados geocodificados
+                        return idx > 0; // Saltar el punto inicial
+                    });
+                    // Por simplicidad, usar ubicación original
+                    inicioLat = miLat;
+                    inicioLon = miLon;
+                }
+
+                let url = `https://www.google.com/maps/dir/${inicioLat},${inicioLon}/`;
+                chunk.forEach(dir => {
+                    url += `${encodeURIComponent(dir)}/`;
+                });
+
+                // Delay entre abrir pestañas para que no las bloquee el navegador
+                setTimeout(() => {
+                    window.open(url, `_blank_ruta_${numeroRuta}`);
+                }, (numeroRuta - 1) * 500);
+            }
+
+            // Mostrar mensaje informativo
+            setTimeout(() => {
+                alert(`✅ Se abrieron ${numeroRutas} rutas en Google Maps.\n\n` +
+                      `Si alguna pestaña fue bloqueada, permite ventanas emergentes en tu navegador.`);
+            }, numeroRutas * 500 + 200);
         }
 
         // Mostrar mapa con Leaflet
@@ -862,6 +1019,83 @@
             `;
         }
 
+        // Variable global para almacenar los resultados optimizados
+        let rutaOptimizadaGlobal = [];
+
+        // Abrir una ruta parcial en Google Maps
+        function abrirRutaParcial(inicio, fin, numeroRuta) {
+            if (rutaOptimizadaGlobal.length === 0) {
+                alert("Error: No hay ruta optimizada disponible");
+                return;
+            }
+
+            // Obtener el grupo de direcciones
+            const grupoRuta = rutaOptimizadaGlobal.slice(inicio, fin);
+            
+            // Construir URL de Google Maps
+            // Punto de inicio: si es la primera ruta, usar ubicación base, sino usar la última dirección del grupo anterior
+            let url;
+            
+            if (inicio === 0) {
+                // Primera ruta: iniciar desde la ubicación base
+                url = `https://www.google.com/maps/dir/${miLat},${miLon}/`;
+            } else {
+                // Rutas siguientes: iniciar desde la última dirección del grupo anterior
+                const direccionInicio = rutaOptimizadaGlobal[inicio - 1].direccion;
+                url = `https://www.google.com/maps/dir/${encodeURIComponent(direccionInicio)}/`;
+            }
+            
+            // Agregar todas las direcciones del grupo
+            grupoRuta.forEach(punto => {
+                url += `${encodeURIComponent(punto.direccion)}/`;
+            });
+            
+            // Abrir en nueva pestaña
+            window.open(url, "_blank");
+            
+            // Mostrar mensaje de confirmación
+            mostrarMensajeRutaAbierta(numeroRuta, grupoRuta.length);
+        }
+
+        // Mostrar mensaje cuando se abre una ruta
+        function mostrarMensajeRutaAbierta(numeroRuta, cantidad) {
+            const notif = document.createElement('div');
+            notif.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                color: white;
+                padding: 20px 30px;
+                border-radius: 12px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                z-index: 10000;
+                font-weight: 600;
+                font-size: 15px;
+                animation: slideIn 0.3s ease;
+            `;
+            notif.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px;">🗺️</span>
+                    <div>
+                        <div><strong>Ruta ${numeroRuta} abierta en Maps</strong></div>
+                        <div style="font-size: 13px; opacity: 0.9; margin-top: 3px;">${cantidad} direcciones cargadas</div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notif);
+            
+            setTimeout(() => {
+                notif.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    if (document.body.contains(notif)) {
+                        document.body.removeChild(notif);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
         // Inicializar mapa vacío al cargar
         window.addEventListener('load', () => {
             mapa = L.map('mapa').setView([-12.046374, -77.042793], 11); // Lima, Perú por defecto
@@ -869,6 +1103,32 @@
                 maxZoom: 19,
                 attribution: '© OpenStreetMap contributors'
             }).addTo(mapa);
+            
+            // Agregar animaciones CSS
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                @keyframes slideOut {
+                    from {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
         });
     </script>
 </body>
