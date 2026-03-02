@@ -11,7 +11,7 @@ import {
 
 class SubscriptionService {
   constructor() {
-    this.TRIAL_DAYS = 3;
+    this.TRIAL_DAYS = 7;
     this.isDevelopment = isDevelopment;
   }
 
