@@ -652,165 +652,17 @@
 
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-       
-
-        // Generar ID único del dispositivo
-        function getDeviceId() {
-            let deviceId = localStorage.getItem('device_id');
-            if (!deviceId) {
-                deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                localStorage.setItem('device_id', deviceId);
-            }
-            return deviceId;
-        }
-
-        // Verificar estado de suscripción
-        function checkSubscription() {
-            const firstVisit = localStorage.getItem('first_visit');
-            const activationCode = localStorage.getItem('activation_code');
-            const deviceId = getDeviceId();
-            
-            // Primera visita - iniciar trial
-            if (!firstVisit) {
-                const now = Date.now();
-                localStorage.setItem('first_visit', now);
-                localStorage.setItem('subscription_status', 'trial');
-                return { status: 'trial', expires: now + (SUBSCRIPTION_CONFIG.TRIAL_DAYS * 24 * 60 * 60 * 1000) };
-            }
-            
-            // Verificar si tiene código activado
-            if (activationCode) {
-                const codeData = JSON.parse(localStorage.getItem('code_data_' + activationCode) || '{}');
-                if (codeData.deviceId === deviceId) {
-                    const now = Date.now();
-                    if (codeData.expiresAt > now) {
-                        return { status: 'active', expires: codeData.expiresAt, code: activationCode };
-                    } else {
-                        return { status: 'expired', code: activationCode };
-                    }
-                }
-            }
-            
-            // Verificar trial
-            const firstVisitTime = parseInt(firstVisit);
-            const trialExpires = firstVisitTime + (SUBSCRIPTION_CONFIG.TRIAL_DAYS * 24 * 60 * 60 * 1000);
-            const now = Date.now();
-            
-            if (now < trialExpires) {
-                return { status: 'trial', expires: trialExpires };
-            } else {
-                return { status: 'expired' };
-            }
-        }
-
-        // Activar código
-        function activateCode(code) {
-            code = code.toUpperCase().trim();
-            
-            // Validar formato del código
-            if (!code.startsWith('CESAR-')) {
-                return { success: false, message: 'Código inválido. Debe comenzar con CESAR-' };
-            }
-            
-            // Extraer duración del código
-            let durationMs = 0;
-            let durationType = '';
-            
-            if (code.includes('UNLIMITED')) {
-                durationMs = 365 * 24 * 60 * 60 * 1000 * 10; // 10 años
-                durationType = 'ilimitado';
-            } else if (code.includes('-1H')) {
-                durationMs = 1 * 60 * 60 * 1000;
-                durationType = '1 hora';
-            } else if (code.includes('-3H')) {
-                durationMs = 3 * 60 * 60 * 1000;
-                durationType = '3 horas';
-            } else if (code.includes('-1D')) {
-                durationMs = 1 * 24 * 60 * 60 * 1000;
-                durationType = '1 día';
-            } else if (code.includes('-3D')) {
-                durationMs = 3 * 24 * 60 * 60 * 1000;
-                durationType = '3 días';
-            } else if (code.includes('-7D')) {
-                durationMs = 7 * 24 * 60 * 60 * 1000;
-                durationType = '7 días';
-            } else if (code.includes('-15D')) {
-                durationMs = 15 * 24 * 60 * 60 * 1000;
-                durationType = '15 días';
-            } else if (code.includes('-30D')) {
-                durationMs = 30 * 24 * 60 * 60 * 1000;
-                durationType = '30 días';
-            } else if (code.includes('-90D')) {
-                durationMs = 90 * 24 * 60 * 60 * 1000;
-                durationType = '90 días';
-            } else if (code.includes('-180D')) {
-                durationMs = 180 * 24 * 60 * 60 * 1000;
-                durationType = '180 días';
-            } else if (code.includes('-365D')) {
-                durationMs = 365 * 24 * 60 * 60 * 1000;
-                durationType = '1 año';
-            } else {
-                return { success: false, message: 'Formato de código inválido' };
-            }
-            
-            const deviceId = getDeviceId();
-            const existingData = JSON.parse(localStorage.getItem('code_data_' + code) || '{}');
-            
-            // Verificar si el código ya está en uso en otro dispositivo
-            if (existingData.deviceId && existingData.deviceId !== deviceId) {
-                return { 
-                    success: false, 
-                    message: 'Este código ya está registrado en otro dispositivo. Contacta al 989 660 431 para transferirlo.' 
-                };
-            }
-            
-            // Activar código
-            const now = Date.now();
-            const expiresAt = now + durationMs;
-            
-            const codeData = {
-                code: code,
-                deviceId: deviceId,
-                activatedAt: now,
-                expiresAt: expiresAt,
-                durationType: durationType
-            };
-            
-            localStorage.setItem('activation_code', code);
-            localStorage.setItem('code_data_' + code, JSON.stringify(codeData));
-            localStorage.setItem('subscription_status', 'active');
-            
-            return { 
-                success: true, 
-                message: `¡Código activado! Tienes acceso por ${durationType}`,
-                expires: expiresAt
-            };
-        }
-
-        // Formatear tiempo restante
-        function formatTimeRemaining(ms) {
-            const days = Math.floor(ms / (24 * 60 * 60 * 1000));
-            const hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
-            const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
-            
-            if (days > 0) {
-                return `${days} día${days > 1 ? 's' : ''} ${hours}h`;
-            } else if (hours > 0) {
-                return `${hours} hora${hours > 1 ? 's' : ''} ${minutes}m`;
-            } else {
-                return `${minutes} minuto${minutes > 1 ? 's' : ''}`;
-            }
-        }
-
-        // Mostrar modal de suscripción
-        function showSubscriptionModal(subscriptionData) {
+        // =============================================
+        // FUNCIONES DEL MODAL (SUSCRIPCIÓN)
+        // =============================================
+        function showSubscriptionModal(subscription) {
             const modal = document.getElementById('subscription-modal');
             const modalTitle = document.getElementById('modal-title');
             const modalMessage = document.getElementById('modal-message');
             const modalBody = document.getElementById('modal-body');
             
-            if (subscriptionData.status === 'trial') {
-                const timeRemaining = subscriptionData.expiresAt.getTime() - Date.now();
+            if (subscription.status === 'trial') {
+                const timeRemaining = subscription.expiresAt - Date.now();
                 const formattedTime = formatTimeRemaining(timeRemaining);
                 
                 modalTitle.textContent = '¡Bienvenido a Rutas Pro! 🎉';
@@ -828,15 +680,15 @@
                     </p>
                 `;
                 
-            } else if (subscriptionData.status === 'active') {
-                const timeRemaining = subscriptionData.expiresAt.getTime() - Date.now();
+            } else if (subscription.status === 'active') {
+                const timeRemaining = subscription.expiresAt - Date.now();
                 const formattedTime = formatTimeRemaining(timeRemaining);
                 
                 modalTitle.textContent = '✅ Acceso Activo';
                 modalMessage.innerHTML = `
                     <div class="trial-badge">Tu suscripción está activa</div>
                     <p>Tiempo restante: <strong>${formattedTime}</strong></p>
-                    <p>Código: <strong>${subscriptionData.code}</strong></p>
+                    <p>Código: <strong>${subscription.code}</strong></p>
                 `;
                 modalBody.innerHTML = `
                     <button class="modal-button modal-button-primary" onclick="closeModal()">
@@ -844,7 +696,7 @@
                     </button>
                 `;
                 
-            } else if (subscriptionData.status === 'expired') {
+            } else if (subscription.status === 'expired') {
                 modalTitle.textContent = '🔒 Acceso Expirado';
                 modalMessage.innerHTML = `
                     <div class="expired-badge">Tu acceso ha expirado</div>
@@ -852,7 +704,7 @@
                 `;
                 modalBody.innerHTML = `
                     <input type="text" id="activation-code-input" class="modal-input" placeholder="INGRESA TU CÓDIGO" />
-                    <button class="modal-button modal-button-primary" onclick="submitActivationCode()">
+                    <button class="modal-button modal-button-primary" onclick="window.submitActivationCode()">
                         Activar Código
                     </button>
                     <div class="contact-info">
@@ -868,22 +720,48 @@
             modal.style.display = 'flex';
         }
 
-        // Cerrar modal
         function closeModal() {
-            const subscriptionData = checkSubscription();
-            if (subscriptionData.status === 'expired') {
-                return; // No cerrar si está expirado
-            }
             document.getElementById('subscription-modal').style.display = 'none';
             document.getElementById('main-content').classList.remove('blur-content');
         }
 
-        // Mostrar input de activación
+        function formatTimeRemaining(ms) {
+            const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+            const hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+            const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
+            
+            if (days > 0) {
+                return `${days} día${days > 1 ? 's' : ''} ${hours}h`;
+            } else if (hours > 0) {
+                return `${hours} hora${hours > 1 ? 's' : ''} ${minutes}m`;
+            } else {
+                return `${minutes} minuto${minutes > 1 ? 's' : ''}`;
+            }
+        }
+
+        function updateSubscriptionBadge(subscription) {
+            const badge = document.querySelector('.header-badge');
+            if (!badge) return;
+            
+            if (subscription.status === 'trial') {
+                const timeRemaining = subscription.expiresAt - Date.now();
+                badge.textContent = `⏱️ Trial: ${formatTimeRemaining(timeRemaining)}`;
+                badge.style.background = 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)';
+            } else if (subscription.status === 'active') {
+                const timeRemaining = subscription.expiresAt - Date.now();
+                badge.textContent = `✅ Activo: ${formatTimeRemaining(timeRemaining)}`;
+                badge.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            } else {
+                badge.textContent = '🔒 Expirado';
+                badge.style.background = 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)';
+            }
+        }
+
         function showActivationInput() {
             const modalBody = document.getElementById('modal-body');
             modalBody.innerHTML = `
                 <input type="text" id="activation-code-input" class="modal-input" placeholder="INGRESA TU CÓDIGO" />
-                <button class="modal-button modal-button-primary" onclick="submitActivationCode()">
+                <button class="modal-button modal-button-primary" onclick="window.submitActivationCode()">
                     Activar Código
                 </button>
                 <button class="modal-button modal-button-secondary" onclick="location.reload()">
@@ -893,74 +771,15 @@
             document.getElementById('activation-code-input').focus();
         }
 
-        // Enviar código de activación
-        function submitActivationCode() {
-            const input = document.getElementById('activation-code-input');
-            const code = input.value.trim();
-            
-            if (!code) {
-                alert('Por favor ingresa un código');
-                return;
-            }
-            
-            const result = activateCode(code);
-            
-            if (result.success) {
-                alert(result.message);
-                location.reload();
-            } else {
-                alert('❌ ' + result.message);
-                input.value = '';
-                input.focus();
-            }
-        }
-
-        // Actualizar badge en header
-        function updateSubscriptionBadge() {
-            const subscriptionData = checkSubscription();
-            const badge = document.querySelector('.header-badge');
-            
-            if (!badge) return;
-            
-            if (subscriptionData.status === 'trial') {
-                const timeRemaining = subscriptionData.expiresAt.getTime() - Date.now();
-                const formattedTime = formatTimeRemaining(timeRemaining);
-                badge.textContent = `⏱️ Trial: ${formattedTime}`;
-                badge.style.background = 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)';
-            } else if (subscriptionData.status === 'active') {
-                const timeRemaining = subscriptionData.expiresAt.getTime() - Date.now();
-                const formattedTime = formatTimeRemaining(timeRemaining);
-                badge.textContent = `✅ Activo: ${formattedTime}`;
-                badge.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            } else {
-                badge.textContent = '🔒 Expirado';
-                badge.style.background = 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)';
-            }
-        }
-
-        // Verificar suscripción al cargar
-        window.addEventListener('load', () => {
-            const subscriptionData = checkSubscription();
-            
-            // Siempre mostrar el modal al inicio
-            setTimeout(() => {
-                showSubscriptionModal(subscriptionData);
-            }, 500);
-            
-            // Actualizar badge cada minuto
-            updateSubscriptionBadge();
-            setInterval(updateSubscriptionBadge, 60000);
-        });
-
-        // ===================================
-        // FIN SISTEMA DE SUSCRIPCIÓN
-        // ===================================
-
+        // =============================================
+        // FUNCIONES DE OPTIMIZACIÓN DE RUTAS
+        // =============================================
         let mapa;
         let ordenFinal = [];
         let miLat;
         let miLon;
         let coordenadasRuta = [];
+        let rutaOptimizadaGlobal = [];
 
         // Función principal de optimización
         async function optimizar() {
@@ -1249,10 +1068,6 @@
                     const finGrupo = Math.min(index + MAX_PARADAS_GOOGLE, ruta.length);
                     const direccionesGrupo = ruta.slice(index, finGrupo).map(p => p.direccion);
                     
-                    // Determinar punto de inicio (para la primera ruta es miLat/miLon, para las demás es la última dirección del grupo anterior)
-                    let inicioLat = miLat;
-                    let inicioLon = miLon;
-                    
                     html += `
                         <div style="
                             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1348,20 +1163,11 @@
                 const chunk = ordenFinal.slice(i, i + MAX_PARADAS_GOOGLE);
                 const numeroRuta = Math.floor(i / MAX_PARADAS_GOOGLE) + 1;
                 
-                // Determinar el punto de inicio
                 let inicioLat, inicioLon;
                 if (i === 0) {
-                    // Primera ruta: usar ubicación original
                     inicioLat = miLat;
                     inicioLon = miLon;
                 } else {
-                    // Rutas siguientes: buscar coordenadas de la última dirección de la ruta anterior
-                    const direccionAnterior = ordenFinal[i - 1];
-                    const puntoAnterior = coordenadasRuta.find((coord, idx) => {
-                        // Buscar en resultados geocodificados
-                        return idx > 0; // Saltar el punto inicial
-                    });
-                    // Por simplicidad, usar ubicación original
                     inicioLat = miLat;
                     inicioLon = miLon;
                 }
@@ -1371,17 +1177,80 @@
                     url += `${encodeURIComponent(dir)}/`;
                 });
 
-                // Delay entre abrir pestañas para que no las bloquee el navegador
                 setTimeout(() => {
                     window.open(url, `_blank_ruta_${numeroRuta}`);
                 }, (numeroRuta - 1) * 500);
             }
 
-            // Mostrar mensaje informativo
             setTimeout(() => {
                 alert(`✅ Se abrieron ${numeroRutas} rutas en Google Maps.\n\n` +
                       `Si alguna pestaña fue bloqueada, permite ventanas emergentes en tu navegador.`);
             }, numeroRutas * 500 + 200);
+        }
+
+        // Abrir una ruta parcial en Google Maps
+        function abrirRutaParcial(inicio, fin, numeroRuta) {
+            if (rutaOptimizadaGlobal.length === 0) {
+                alert("Error: No hay ruta optimizada disponible");
+                return;
+            }
+
+            const grupoRuta = rutaOptimizadaGlobal.slice(inicio, fin);
+            
+            let url;
+            
+            if (inicio === 0) {
+                url = `https://www.google.com/maps/dir/${miLat},${miLon}/`;
+            } else {
+                const direccionInicio = rutaOptimizadaGlobal[inicio - 1].direccion;
+                url = `https://www.google.com/maps/dir/${encodeURIComponent(direccionInicio)}/`;
+            }
+            
+            grupoRuta.forEach(punto => {
+                url += `${encodeURIComponent(punto.direccion)}/`;
+            });
+            
+            window.open(url, "_blank");
+            mostrarMensajeRutaAbierta(numeroRuta, grupoRuta.length);
+        }
+
+        // Mostrar mensaje cuando se abre una ruta
+        function mostrarMensajeRutaAbierta(numeroRuta, cantidad) {
+            const notif = document.createElement('div');
+            notif.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                color: white;
+                padding: 20px 30px;
+                border-radius: 12px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+                z-index: 10000;
+                font-weight: 600;
+                font-size: 15px;
+                animation: slideIn 0.3s ease;
+            `;
+            notif.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px;">🗺️</span>
+                    <div>
+                        <div><strong>Ruta ${numeroRuta} abierta en Maps</strong></div>
+                        <div style="font-size: 13px; opacity: 0.9; margin-top: 3px;">${cantidad} direcciones cargadas</div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notif);
+            
+            setTimeout(() => {
+                notif.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    if (document.body.contains(notif)) {
+                        document.body.removeChild(notif);
+                    }
+                }, 300);
+            }, 3000);
         }
 
         // Mostrar mapa con Leaflet
@@ -1471,83 +1340,6 @@
             `;
         }
 
-        // Variable global para almacenar los resultados optimizados
-        let rutaOptimizadaGlobal = [];
-
-        // Abrir una ruta parcial en Google Maps
-        function abrirRutaParcial(inicio, fin, numeroRuta) {
-            if (rutaOptimizadaGlobal.length === 0) {
-                alert("Error: No hay ruta optimizada disponible");
-                return;
-            }
-
-            // Obtener el grupo de direcciones
-            const grupoRuta = rutaOptimizadaGlobal.slice(inicio, fin);
-            
-            // Construir URL de Google Maps
-            // Punto de inicio: si es la primera ruta, usar ubicación base, sino usar la última dirección del grupo anterior
-            let url;
-            
-            if (inicio === 0) {
-                // Primera ruta: iniciar desde la ubicación base
-                url = `https://www.google.com/maps/dir/${miLat},${miLon}/`;
-            } else {
-                // Rutas siguientes: iniciar desde la última dirección del grupo anterior
-                const direccionInicio = rutaOptimizadaGlobal[inicio - 1].direccion;
-                url = `https://www.google.com/maps/dir/${encodeURIComponent(direccionInicio)}/`;
-            }
-            
-            // Agregar todas las direcciones del grupo
-            grupoRuta.forEach(punto => {
-                url += `${encodeURIComponent(punto.direccion)}/`;
-            });
-            
-            // Abrir en nueva pestaña
-            window.open(url, "_blank");
-            
-            // Mostrar mensaje de confirmación
-            mostrarMensajeRutaAbierta(numeroRuta, grupoRuta.length);
-        }
-
-        // Mostrar mensaje cuando se abre una ruta
-        function mostrarMensajeRutaAbierta(numeroRuta, cantidad) {
-            const notif = document.createElement('div');
-            notif.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-                color: white;
-                padding: 20px 30px;
-                border-radius: 12px;
-                box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-                z-index: 10000;
-                font-weight: 600;
-                font-size: 15px;
-                animation: slideIn 0.3s ease;
-            `;
-            notif.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 24px;">🗺️</span>
-                    <div>
-                        <div><strong>Ruta ${numeroRuta} abierta en Maps</strong></div>
-                        <div style="font-size: 13px; opacity: 0.9; margin-top: 3px;">${cantidad} direcciones cargadas</div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(notif);
-            
-            setTimeout(() => {
-                notif.style.animation = 'slideOut 0.3s ease';
-                setTimeout(() => {
-                    if (document.body.contains(notif)) {
-                        document.body.removeChild(notif);
-                    }
-                }, 300);
-            }, 3000);
-        }
-
         // Inicializar mapa vacío al cargar
         window.addEventListener('load', () => {
             mapa = L.map('mapa').setView([-12.046374, -77.042793], 11); // Lima, Perú por defecto
@@ -1583,96 +1375,94 @@
             document.head.appendChild(style);
         });
     </script>
-    <!-- Agregar Firebase SDK -->
-<!-- index.html - Agregar al final del body -->
-<script type="module">
-  // Importar servicios
-  import SubscriptionService from './subscription-service.js';
-  
-  // Instanciar servicio
-  const subscriptionService = new SubscriptionService();
-  
-  // ⭐ Verificar suscripción al cargar (USA FIREBASE TIMESTAMP)
-  window.addEventListener('load', async () => {
-    try {
-      const subscription = await subscriptionService.checkSubscription();
-      console.log('📊 Estado de suscripción:', subscription);
-      showSubscriptionModal(subscription);
-      
-      // Actualizar badge cada minuto
-      updateSubscriptionBadge(subscription);
-      setInterval(async () => {
-        const newSub = await subscriptionService.checkSubscription();
-        updateSubscriptionBadge(newSub);
-      }, 60000);
-    } catch (error) {
-      console.error('Error verificando suscripción:', error);
-    }
-  });
-  
-  // ⭐ Función para activar código
-  window.submitActivationCode = async function() {
-    const input = document.getElementById('activation-code-input');
-    const code = input.value.trim();
-    
-    if (!code) {
-      alert('Por favor ingresa un código');
-      return;
-    }
-    
-    const result = await subscriptionService.activateCode(code);
-    
-    if (result.success) {
-      alert(result.message);
-      location.reload();
-    } else {
-      alert('❌ ' + result.message);
-      input.value = '';
-      input.focus();
-    }
-  };
-  
-  // ⭐ Registrar uso al optimizar
-  const originalOptimizar = window.optimizar;
-  window.optimizar = async function() {
-    const direcciones = document.getElementById("direcciones").value;
-    const totalDirecciones = direcciones.split("\n").filter(d => d.trim()).length;
-    
-    // Registrar uso
-    await subscriptionService.logUsage('optimize', { 
-      addresses: totalDirecciones,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Llamar función original
-    if (originalOptimizar) {
-      originalOptimizar();
-    }
-  };
-  
-  // ⭐ Funciones para pruebas (solo en desarrollo)
-  if (window.location.hostname === 'localhost') {
-    window.devTools = {
-      simulateDays: async (days) => {
-        await subscriptionService.simulateTimeForTesting(days);
-        alert(`🧪 Simulados ${days} días. Recarga la página.`);
-        location.reload();
-      },
-      resetDevice: async () => {
-        await subscriptionService.resetDeviceForTesting();
-        alert('🧪 Dispositivo resetado. Recarga la página.');
-        location.reload();
-      },
-      checkStatus: async () => {
-        const status = await subscriptionService.checkSubscription();
-        console.table(status);
-        alert('Revisa la consola (F12) para ver el estado');
-      }
-    };
-    
-    console.log('🔧 DevTools disponibles: window.devTools');
-  }
-</script>
-
+    <!-- Firebase y Suscripción Moderna -->
+    <script type="module">
+        // Importar servicios
+        import SubscriptionService from './subscription-service.js';
+        
+        // Instanciar servicio
+        const subscriptionService = new SubscriptionService();
+        
+        // ⭐ Verificar suscripción al cargar (USA FIREBASE TIMESTAMP)
+        window.addEventListener('load', async () => {
+            try {
+                const subscription = await subscriptionService.checkSubscription();
+                console.log('📊 Estado de suscripción:', subscription);
+                showSubscriptionModal(subscription);
+                
+                // Actualizar badge cada minuto
+                updateSubscriptionBadge(subscription);
+                setInterval(async () => {
+                    const newSub = await subscriptionService.checkSubscription();
+                    updateSubscriptionBadge(newSub);
+                }, 60000);
+            } catch (error) {
+                console.error('Error verificando suscripción:', error);
+            }
+        });
+        
+        // ⭐ Función para activar código
+        window.submitActivationCode = async function() {
+            const input = document.getElementById('activation-code-input');
+            const code = input.value.trim();
+            
+            if (!code) {
+                alert('Por favor ingresa un código');
+                return;
+            }
+            
+            const result = await subscriptionService.activateCode(code);
+            
+            if (result.success) {
+                alert(result.message);
+                location.reload();
+            } else {
+                alert('❌ ' + result.message);
+                input.value = '';
+                input.focus();
+            }
+        };
+        
+        // ⭐ Registrar uso al optimizar
+        const originalOptimizar = window.optimizar;
+        window.optimizar = async function() {
+            const direcciones = document.getElementById("direcciones").value;
+            const totalDirecciones = direcciones.split("\n").filter(d => d.trim()).length;
+            
+            // Registrar uso
+            await subscriptionService.logUsage('optimize', { 
+                addresses: totalDirecciones,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Llamar función original
+            if (originalOptimizar) {
+                originalOptimizar();
+            }
+        };
+        
+        // ⭐ Funciones para pruebas (solo en desarrollo)
+        if (window.location.hostname === 'localhost') {
+            window.devTools = {
+                simulateDays: async (days) => {
+                    await subscriptionService.simulateTimeForTesting(days);
+                    alert(`🧪 Simulados ${days} días. Recarga la página.`);
+                    location.reload();
+                },
+                resetDevice: async () => {
+                    await subscriptionService.resetDeviceForTesting();
+                    alert('🧪 Dispositivo resetado. Recarga la página.');
+                    location.reload();
+                },
+                checkStatus: async () => {
+                    const status = await subscriptionService.checkSubscription();
+                    console.table(status);
+                    alert('Revisa la consola (F12) para ver el estado');
+                }
+            };
+            
+            console.log('🔧 DevTools disponibles: window.devTools');
+        }
+    </script>
 </body>
 </html>
